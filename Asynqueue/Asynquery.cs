@@ -1,7 +1,6 @@
 ﻿namespace Asynqueue
 {
     using System;
-    using System.Runtime.CompilerServices;
 
     /// <summary>
     /// Asynquery is a helper class that represents a single query being sent to and
@@ -13,20 +12,21 @@
     {
         private TOut response;
         private Exception exception;
-        private Action continuation;
+        private volatile Action continuation;
 
-        public bool IsCompleted { get; set; }
+        public bool IsCompleted => _isCompleted;
+        private bool _isCompleted;
 
         public TIn Input { get; set; }
 
         public Asynquery(TIn input)
         {
-            this.Input = input;
+            Input = input;
         }
 
         public void Respond(Exception ex)
         {
-            Respond(() => this.exception = ex);
+            Respond(() => exception = ex);
         }
 
         public void Respond(TOut response)
@@ -41,15 +41,12 @@
 
         public void OnCompleted(Action continuation)
         {
-            // Locking on self. Don't care if it's bad form.
-            lock (this)
+            this.continuation = continuation;
+            if (IsCompleted)
             {
-                this.continuation = continuation;
-                if (this.IsCompleted)
-                {
-                    this.continuation();
-                }
+                continuation?.Invoke();
             }
+
         }
 
         public TOut GetResult()
@@ -61,16 +58,10 @@
 
         private void Respond(Action fn)
         {
-            lock (this)
-            {
-                fn();
-                this.IsCompleted = true;
+            fn?.Invoke();
+            _isCompleted = true;
 
-                if (this.continuation != null)
-                {
-                    this.continuation();
-                }
-            }
+            continuation?.Invoke();
         }
     }
 }

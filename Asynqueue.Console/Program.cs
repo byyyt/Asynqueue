@@ -41,6 +41,9 @@
                 case "bidirectional":
                     await AveragePerf(BidirectionalQueue);
                     break;
+                case "buff":
+                    await AveragePerf(BuffQueue);
+                    break;
                 default:
                     PrintHelp();
                     break;
@@ -86,6 +89,27 @@
             }
 
             return await done.Task;
+        }
+
+        private static Task<long> BuffQueue()
+        {
+            const int NumMessages = 1000000;
+            var countdown = new CountdownEvent(NumMessages);
+            Stopwatch w = Stopwatch.StartNew();
+
+            var qout = new Asynqueue<string>(_ =>
+            {
+                countdown.Signal();
+            });
+
+            for (var x = 0; x < NumMessages; ++x)
+            {
+                qout.Send("Msg " + x);
+            }
+
+            countdown.Wait();
+
+            return Task.FromResult(w.ElapsedMilliseconds);
         }
 
         /// <summary>
